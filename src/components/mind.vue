@@ -400,13 +400,12 @@ export default {
       // 添加鼠标按下监听
       const that = this;
       el.addEventListener("mousedown", function () {
-        // 当鼠标按下时, 添加鼠标移动监听
-
         // 开启动画
         that.dragEvent.startX = -9999;
         that.dragEvent.startY = -9999;
         that.animating = true;
         that.animation();
+        // 当鼠标按下时, 添加鼠标移动监听
         document.addEventListener("mousemove", callback);
       });
       // 添加鼠标弹起监听 , 即鼠标不在按下
@@ -447,13 +446,11 @@ export default {
             // 如果找到了父节点 遍历他的子节点找到第一个y坐标大于target.y的节点并在他前面插入
             if (node.id === that.dragEvent.parent.id) {
               if (!node.children || node.children.length === 0) return that.$set(node, 'children', [that.dragEvent.target]);
-              else for (let i = 0; i < node.children.length; i++) if (node.children[i].y >= that.dragEvent.target.y) return node.children.splice(i, 0, that.dragEvent.target)
+              else for (let i = 0; i < node.children.length; i++) if (node.children[i].y >= that.dragEvent.target.y || i === node.children.length - 1) return node.children.splice(i - 1, 0, that.dragEvent.target)
             }
             if (node.children && node.children.length !== 0) for (let child of node.children) ergodicTreeForInsert(child)
           }
           ergodicTreeForInsert(newTree);
-          console.log('newTree', newTree);
-
           that.$emit('treeChange', newTree)
         }
         that.dragEvent = {
@@ -629,11 +626,8 @@ export default {
       return this;
     };
 
-
-
     const canvas = this.$refs.canvas;
     this.mouseDownAndMove(canvas, this.handleMouseDownAndMove);
-
     this.renderTree = Object.assign({}, this.tree);
     this.render();
   },

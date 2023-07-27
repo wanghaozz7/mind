@@ -1,17 +1,12 @@
 <template>
-  <div>
-    <!-- <my_canvas :tree="tree"></my_canvas> -->
-    <mind :tree="tree" @treeChange="handleTreeChange" />
-  </div>
+  <mind :tree="tree" @treeChange="handleTreeChange" />
 </template>
 
 <script>
-import my_canvas from '@/components/my_canvas.vue'
 import mind from '@/components/mind.vue'
 export default {
   name: "home",
   components: {
-    my_canvas,
     mind
   },
   data() {
