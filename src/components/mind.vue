@@ -189,12 +189,12 @@ export default {
 
       // 如果正在拖拽节点
       if (this.dragEvent.target) {
+        this.resetState();
         // 如果拖动的是根节点 拖动整棵树
         if (this.dragEvent.target?.id === this.renderTree.id) {
           ctx.dashedBox(this.renderTree).stroke();
           ctx.setLineDash([]);
         } else if (this.dragEvent.target?.id === node.id) {
-          console.log(node.label);
           // 如果拖动的是其他节点 则遍历到该节点时复制一个相同的节点并根据拖动偏移量计算出新位置并找到离它最近的节点模拟为新的父节点
           const newNode = Object.assign({}, node);
           newNode.x += this.dragEvent.changeX;
