@@ -70,7 +70,7 @@ export default {
   },
   methods: {
     handleTreeChange(newTree) {
-      this.tree = newTree
+      this.tree = newTree;
     }
   }
 };

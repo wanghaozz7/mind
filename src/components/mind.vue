@@ -436,7 +436,7 @@ export default {
       this.input.fontSize = 24;
       this.input.height = 30;
     },
-    // 输入回调
+    // 输入变化回调
     handleInput(e) {
       const input = this.$refs.input;
       this.editNode.target.label = input.value;
@@ -445,11 +445,21 @@ export default {
       // 动态更新输入框的长度
       this.input.width = this.editNode.target.width - 30;
     },
-    // 捕捉回车
-    handleInputChange() {
-      // 处理节点名字规范性(不能为空等)
-      this.handleInvalidClick();
-      // 修改完毕后将修改后的树返回
+    // 输入完成回调
+    handleInputChange(e) {
+      // 输入完成后返回修改后的树
+      const target = this.editNode.target;
+      const newLabel = this.$refs.input.value;
+      const newTree = Object.assign({}, this.tree);
+
+      const ergodicTree = node => {
+        if (node.id === target.id) return node.label = newLabel;
+        if (node.children && node.children.length !== 0) for (let child of node.children) ergodicTree(child);
+      }
+
+      ergodicTree(newTree);
+
+      this.$emit('treeChange', newTree);
     },
     // 在一个节点的末位添加一个新节点
     addNode(target) {
@@ -581,7 +591,6 @@ export default {
       if (!this.dragEvent.target) return;
       this.dragEvent.changeX = e.x - this.dragEvent.startX;
       this.dragEvent.changeY = e.y - this.dragEvent.startY;
-
     },
     // 开启动画
     animation() {
