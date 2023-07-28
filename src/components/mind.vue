@@ -7,6 +7,61 @@
 </template>
 
 <script>
+const nodeAttrs = {
+  height: 50,
+  verticalGap: 30,
+  horizonGap: 150,
+  horizonPadding: 15
+};
+
+const editNode = {
+  target: null,
+  showButton: false,
+  showInput: false,
+  addButton: {
+    label: undefined,
+    id: undefined,
+    x: undefined,
+    y: undefined,
+    r: undefined
+  },
+  deleteButton: {
+    label: undefined,
+    id: undefined,
+    x: undefined,
+    y: undefined,
+    r: undefined
+  }
+};
+
+const preClick = {
+  target: null,
+  time: new Date()
+};
+
+const input = {
+  top: undefined,
+  left: undefined,
+  width: undefined,
+  height: undefined,
+  fontSize: undefined,
+  value: undefined
+};
+
+const dragEvent = {
+  target: null,
+  startX: undefined,
+  startY: undefined,
+  changeX: undefined,
+  changeY: undefined,
+  parent: null
+};
+
+const rootPreCoordinate = {
+  x: undefined,
+  y: undefined
+};
+
 export default {
   name: 'mind',
   props: {
@@ -20,58 +75,15 @@ export default {
   data() {
     return {
       renderTree: null,
-      nodeAttrs: {
-        height: 50,
-        verticalGap: 30,
-        horizonGap: 150,
-        horizonPadding: 15
-      },
+      nodeAttrs,
       searchArray: new Array(),
-      editNode: {
-        target: null,
-        showButton: false,
-        showInput: false,
-        addButton: {
-          label: undefined,
-          id: undefined,
-          x: undefined,
-          y: undefined,
-          r: undefined
-        },
-        deleteButton: {
-          label: undefined,
-          id: undefined,
-          x: undefined,
-          y: undefined,
-          r: undefined
-        }
-      },
-      preClick: {
-        target: null,
-        time: new Date()
-      },
-      input: {
-        top: undefined,
-        left: undefined,
-        width: undefined,
-        height: undefined,
-        fontSize: undefined,
-        value: undefined
-      },
-      dragEvent: {
-        target: null,
-        startX: undefined,
-        startY: undefined,
-        changeX: undefined,
-        changeY: undefined,
-        parent: null
-      },
+      editNode,
+      preClick,
+      input,
+      dragEvent,
       animating: false,
       requestAnimation: null,
-      rootPreCoordinate: {
-        x: undefined,
-        y: undefined
-      }
+      rootPreCoordinate
     }
   },
   computed: {
@@ -633,6 +645,7 @@ export default {
         x: x - 15,
         y: y + that.nodeAttrs.height / 2
       }
+      // 虚线框的四角
       const corner = [
         {
           x: rawCoordinate.x,
