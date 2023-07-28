@@ -88,7 +88,6 @@ const rootPreCoordinate = {
   y: undefined
 };
 
-
 export default {
   name: 'mind',
   props: {
@@ -556,10 +555,10 @@ export default {
               // 如果父节点是叶子节点
               if (!node.children || node.children.length === 0) return that.$set(node, 'children', [that.dragEvent.target]);
               else {
-                // 遍历子节点找到第一个在鼠标上方的节点
+                // 根据拖拽节点的位置插入
                 for (let i = node.children.length - 1; i >= 0; i--) {
                   const child = node.children[i];
-                  if (child.y <= that.dragEvent.target.y || i === 0) return node.children.splice(i, 0, that.dragEvent.target);
+                  if (child.y <= that.dragEvent.target.y + that.dragEvent.changeY) return node.children.splice(i + 1, 0, that.dragEvent.target);
                 }
               }
             }
