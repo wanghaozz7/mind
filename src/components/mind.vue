@@ -1,5 +1,5 @@
 <template>
-  <div class="mind">
+  <div class="mind" :style="getMindStyle">
     <canvas ref="canvas" />
     <input type="text" :style="getInputStyle" class="input" @input="handleInput" @change="handleInputChange" ref="input"
       v-show="editNode.showInput">
@@ -7,6 +7,11 @@
 </template>
 
 <script>
+const canvasAttrs = {
+  width: undefined,
+  height: undefined
+};
+
 const nodeAttrs = {
   height: 50,
   verticalGap: 30,
@@ -62,6 +67,7 @@ const rootPreCoordinate = {
   y: undefined
 };
 
+
 export default {
   name: 'mind',
   props: {
@@ -76,6 +82,7 @@ export default {
     return {
       renderTree: null,
       nodeAttrs,
+      canvasAttrs,
       searchArray: new Array(),
       editNode,
       preClick,
@@ -95,6 +102,14 @@ export default {
       return {
         top, left, height, fontSize, position: 'absolute'
       }
+    },
+    getMindStyle() {
+      const width = this.canvasAttrs.width + 15 + 'px';
+      const height = this.canvasAttrs.height + 15 + 'px';
+      return {
+        width,
+        height
+      }
     }
   },
   methods: {
@@ -113,7 +128,6 @@ export default {
     clearCanvas() {
       const canvas = this.$refs.canvas;
       const ctx = canvas.getContext("2d");
-      this.searchArray.length = 0;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
     },
     // 渲染整棵树
@@ -123,6 +137,7 @@ export default {
       this.getSubtreeHeight(this.renderTree);
       // 根据整个树的高度重新计算画布的高度
       canvas.height = this.renderTree.subtreeHeight + 300;
+      this.canvasAttrs.height = canvas.height;
 
       // rootPreCoordinate代表根节点拖动前的坐标 当拖动结束后会更新 这里是为他赋初值(从左开始 上下居中)
       if (!this.rootPreCoordinate.x) this.rootPreCoordinate.x = 50;
@@ -175,7 +190,10 @@ export default {
         child.x = x;
         child.y = top + child.subtreeHeight / 2;
         // 通过当前节点的x坐标更新画布的最大宽度
-        if (Math.ceil(child.x) + 250 > canvas.width) canvas.width = Math.ceil(child.x) + 250;
+        if (Math.ceil(child.x) + 250 > canvas.width) {
+          canvas.width = Math.ceil(child.x) + 250;
+          this.canvasAttrs.width = canvas.width;
+        }
         top += child.subtreeHeight + this.nodeAttrs.verticalGap;
         this.getRenderTreeAttrs(child);
         this.searchArray.push(child)
@@ -697,8 +715,6 @@ export default {
 <style lang="less" scoped>
 .mind {
   position: relative;
-  width: 100vw;
-  height: 100vh;
   overflow: auto;
 
   .input {
