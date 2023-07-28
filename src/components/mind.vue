@@ -7,16 +7,37 @@
 </template>
 
 <script>
+// 画布属性
 const canvasAttrs = {
   width: undefined,
-  height: undefined
+  height: undefined,
+  // 判定双击的最长间隔
+  doubleClickDelay: 300
 };
 
+// 节点属性
 const nodeAttrs = {
   height: 50,
+  // 竖直间距
   verticalGap: 30,
+  // 水平间距
   horizonGap: 150,
-  horizonPadding: 15
+  // 水平内边距
+  horizonPadding: 15,
+  // 默认边框颜色
+  defaultStrokeStyle: "#FFE384",
+  // 悬浮边框颜色
+  hoverStrokeStyle: '#FF0000',
+  // 边框粗细
+  lineWidth: 2,
+  // 字体颜色
+  fillStyle: 'black',
+  // 字体样式
+  fontStyle: "normal 24px 微软雅黑",
+  // 连线粗细
+  ligatureLineWidth: 1,
+  // 连线颜色
+  ligatureStrokeStyle: 'lightblue'
 };
 
 const editNode = {
@@ -39,7 +60,7 @@ const editNode = {
   }
 };
 
-const preClick = {
+const clickEvent = {
   target: null,
   time: new Date()
 };
@@ -85,12 +106,13 @@ export default {
       canvasAttrs,
       searchArray: new Array(),
       editNode,
-      preClick,
+      clickEvent,
       input,
       dragEvent,
       animating: false,
       requestAnimation: null,
-      rootPreCoordinate
+      rootPreCoordinate,
+      hover: null
     }
   },
   computed: {
@@ -99,16 +121,20 @@ export default {
       const left = this.input.left + 'px';
       const height = this.input.height + 'px';
       const fontSize = this.input.fontSize + 'px';
+      const width = this.input.width + 'px';
       return {
-        top, left, height, fontSize, position: 'absolute'
+        top, left, height, fontSize, position: 'absolute',
+        width
       }
     },
     getMindStyle() {
       const width = this.canvasAttrs.width + 15 + 'px';
       const height = this.canvasAttrs.height + 15 + 'px';
+      const cursor = this.hover ? 'pointer' : 'default';
       return {
         width,
-        height
+        height,
+        cursor
       }
     }
   },
@@ -122,7 +148,9 @@ export default {
       this.clearCanvas();
       this.treeRender();
       canvas.removeEventListener("click", this.handleCanvasClick);
+      canvas.removeEventListener('mousemove', this.handleCanvasMouseMove);
       canvas.addEventListener("click", this.handleCanvasClick);
+      canvas.addEventListener('mousemove', this.handleCanvasMouseMove);
     },
     // 清空画布
     clearCanvas() {
@@ -158,6 +186,7 @@ export default {
       this.getRenderTreeAttrs(this.renderTree);
       this.renderNodes(this.renderTree);
       this.buttonRender();
+
     },
     // 计算每个子树的高度(横向)
     getSubtreeHeight(node) {
@@ -181,6 +210,12 @@ export default {
       if (node.label) for (let char of label) width += ctx.measureText(char).width;
       node.width = width + 2 * this.nodeAttrs.horizonPadding;
 
+      // 更新画布宽度
+      if (Math.ceil(node.x + node.width) + 50 > canvas.width) {
+        canvas.width = Math.ceil(node.x + node.width) + 50;
+        this.canvasAttrs.width = canvas.width;
+      }
+
       // 计算子节点的x y
       const children = node?.children;
       if (!children || children.length === 0) return;
@@ -189,11 +224,6 @@ export default {
       for (let child of children) {
         child.x = x;
         child.y = top + child.subtreeHeight / 2;
-        // 通过当前节点的x坐标更新画布的最大宽度
-        if (Math.ceil(child.x) + 250 > canvas.width) {
-          canvas.width = Math.ceil(child.x) + 250;
-          this.canvasAttrs.width = canvas.width;
-        }
         top += child.subtreeHeight + this.nodeAttrs.verticalGap;
         this.getRenderTreeAttrs(child);
         this.searchArray.push(child)
@@ -284,9 +314,9 @@ export default {
         if (target?.type) {
           if (target.type === 'add') this.addNode(this.editNode.target);
           else if (target.type === 'delete') this.deleteNode(this.editNode.target);
-        } else if (target.id == this.preClick.target?.id) {
+        } else if (target.id == this.clickEvent.target?.id) {
           // 如果点击的是同一个目标则根据间距判断双击事件
-          if (Math.abs(this.preClick.time - time) < 300) this.handleNodeDoubleClick(target);
+          if (Math.abs(this.clickEvent.time - time) < this.canvasAttrs.doubleClickDelay) this.handleNodeDoubleClick(target);
           else this.handleNodeClick(target);
         } else this.handleNodeClick(target);
       } else {
@@ -294,10 +324,19 @@ export default {
         this.handleInvalidClick();
       }
       // 更新上一次的点击对象
-      this.preClick.target = target;
-      this.preClick.time = time;
+      this.clickEvent.target = target;
+      this.clickEvent.time = time;
     },
-    // 根据点击的位置返回被点击的元素
+    // 画布鼠标悬浮事件转发
+    handleCanvasMouseMove(e) {
+      const x = e.offsetX;
+      const y = e.offsetY;
+      const target = this.searchNode(x, y);
+      if (target) this.hover = target;
+      else this.hover = null;
+      this.render();
+    },
+    // 根据坐标返回元素
     searchNode(x, y) {
       // 判断按钮
       if (this.editNode.showButton) {
@@ -332,7 +371,6 @@ export default {
         if (x >= area.xStart && x <= area.xEnd && y >= area.yStart && y <= area.yEnd) return node;
       }
 
-      // 没点击任何元素
       return null;
     },
     // 判断坐标是否在圆内
@@ -397,7 +435,6 @@ export default {
       this.input.left = node.x + 13;
       this.input.fontSize = 24;
       this.input.height = 30;
-      this.input.width = node.width - 30;
     },
     // 输入回调
     handleInput(e) {
@@ -405,11 +442,14 @@ export default {
       this.editNode.target.label = input.value;
       this.editNode.target.id = this.getRandomNodeId(input.value);
       this.render();
+      // 动态更新输入框的长度
+      this.input.width = this.editNode.target.width - 30;
     },
     // 捕捉回车
     handleInputChange() {
       // 处理节点名字规范性(不能为空等)
       this.handleInvalidClick();
+      // 修改完毕后将修改后的树返回
     },
     // 在一个节点的末位添加一个新节点
     addNode(target) {
@@ -583,17 +623,22 @@ export default {
 
       }
       return ans;
-    }
+    },
+
   },
   mounted() {
     const that = this;
     // 绘制节点
     CanvasRenderingContext2D.prototype.roundRect = function (arg) {
-      const { id, x, y, width, label, fontStyle = "normal 24px 微软雅黑", fillStyle = "black", strokeStyle = "#F00" } = arg;
+      const attrs = that.nodeAttrs;
+      const { id, x, y, width, label, } = arg;
+      const { fontStyle = attrs.fontStyle, fillStyle = that.fillStyle, strokeStyle = attrs.defaultStrokeStyle,
+        hoverStrokeStyle = attrs.hoverStrokeStyle, lineWidth = attrs.lineWidth
+      } = arg;
 
-      // 样式
-      this.lineWidth = 2;
-      this.strokeStyle = strokeStyle;
+      this.lineWidth = lineWidth;
+      if (!that.dragEvent.target && id === that.hover?.id) this.strokeStyle = hoverStrokeStyle;
+      else this.strokeStyle = strokeStyle;
       this.font = fontStyle;
       this.fillStyle = fillStyle
 
@@ -615,13 +660,14 @@ export default {
     // 绘制父子节点之间连线
     CanvasRenderingContext2D.prototype.ligature = function (arg) {
       const { start, end } = arg;
+
       const middle = {
         x: start.x + 50,
         y: start.y
       }
 
-      this.lineWidth = 1;
-      this.strokeStyle = "lightblue";
+      this.lineWidth = that.nodeAttrs.ligatureLineWidth;
+      this.strokeStyle = that.nodeAttrs.ligatureStrokeStyle;
 
       this.beginPath();
       this.moveTo(start.x, start.y);
@@ -715,7 +761,6 @@ export default {
 <style lang="less" scoped>
 .mind {
   position: relative;
-  overflow: auto;
 
   .input {
     border: 0;
