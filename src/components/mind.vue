@@ -67,7 +67,11 @@ export default {
         parent: null
       },
       animating: false,
-      requestAnimation: null
+      requestAnimation: null,
+      rootPreCoordinate: {
+        x: undefined,
+        y: undefined
+      }
     }
   },
   computed: {
@@ -82,6 +86,7 @@ export default {
     }
   },
   methods: {
+    // 更新画布内容
     render() {
       // 清理画布
       // 渲染树
@@ -91,6 +96,41 @@ export default {
       this.treeRender();
       canvas.removeEventListener("click", this.handleCanvasClick);
       canvas.addEventListener("click", this.handleCanvasClick);
+    },
+    // 清空画布
+    clearCanvas() {
+      const canvas = this.$refs.canvas;
+      const ctx = canvas.getContext("2d");
+      this.searchArray.length = 0;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    },
+    // 渲染整棵树
+    treeRender() {
+      const canvas = this.$refs.canvas;
+      // 计算子树高度 
+      this.getSubtreeHeight(this.renderTree);
+      // 根据整个树的高度重新计算画布的高度
+      canvas.height = this.renderTree.subtreeHeight + 300;
+
+      // rootPreCoordinate代表根节点拖动前的坐标 当拖动结束后会更新 这里是为他赋初值(从左开始 上下居中)
+      if (!this.rootPreCoordinate.x) this.rootPreCoordinate.x = 50;
+      if (!this.rootPreCoordinate.y) this.rootPreCoordinate.y = (this.renderTree.subtreeHeight + 300) / 2;
+
+      this.renderTree.x = this.rootPreCoordinate.x;
+      this.renderTree.y = this.rootPreCoordinate.y;
+
+      // 如果拖拽的是根节点 则根节点新坐标 = 拖动前坐标 + 拖拽开始后的偏移量
+      if (this.dragEvent.target?.id === this.renderTree.id) {
+        this.renderTree.x += this.dragEvent.changeX;
+        this.renderTree.y += this.dragEvent.changeY;
+      }
+
+      this.searchArray.length = 0;
+      this.searchArray.push(this.renderTree)
+      // 计算每个节点的坐标和宽度 并根据最右侧的节点更新画布的宽度
+      this.getRenderTreeAttrs(this.renderTree);
+      this.renderNodes(this.renderTree);
+      this.buttonRender();
     },
     // 计算每个子树的高度(横向)
     getSubtreeHeight(node) {
@@ -106,9 +146,9 @@ export default {
     getRenderTreeAttrs(node) {
       const canvas = this.$refs.canvas;
       const ctx = canvas.getContext("2d");
-      const { label, id, fontStyle = "normal 24px 微软雅黑" } = node;
+      const { label, fontStyle = "normal 24px 微软雅黑" } = node;
 
-      // 计算宽度
+      // 根据节点的文字计算宽度
       ctx.font = fontStyle;
       let width = 0;
       if (node.label) for (let char of label) width += ctx.measureText(char).width;
@@ -120,10 +160,9 @@ export default {
       const x = node.x + node.width + this.nodeAttrs.horizonGap;
       let top = node.y - node.subtreeHeight / 2;
       for (let child of children) {
-        // 拖拽状态下需要计算节点的偏移量
         child.x = x;
         child.y = top + child.subtreeHeight / 2;
-        // 更新画布宽度
+        // 通过当前节点的x坐标更新画布的最大宽度
         if (Math.ceil(child.x) + 250 > canvas.width) canvas.width = Math.ceil(child.x) + 250;
         top += child.subtreeHeight + this.nodeAttrs.verticalGap;
         this.getRenderTreeAttrs(child);
@@ -131,33 +170,40 @@ export default {
       }
 
     },
-    // 渲染节点
+    // 递归渲染所有节点
     renderNodes(node) {
       const canvas = this.$refs.canvas;
       const ctx = canvas.getContext("2d");
 
-      // 绘制拖动节点 (绘制完拖动节点后不能马上去寻找最近的节点)
-      if (this.dragEvent.target && this.dragEvent.target.id === node.id) {
-        const newNode = Object.assign({}, node);
-        newNode.x += this.dragEvent.changeX;
-        newNode.y += this.dragEvent.changeY;
-        ctx.roundRect(newNode).stroke();
-        ctx.dashedBox(node).stroke();
-        ctx.setLineDash([]);
+      // 如果正在拖拽节点
+      if (this.dragEvent.target) {
+        // 如果拖动的是根节点 拖动整棵树
+        if (this.dragEvent.target?.id === this.renderTree.id) {
+          ctx.dashedBox(this.renderTree).stroke();
+          ctx.setLineDash([]);
+        } else if (this.dragEvent.target?.id === node.id) {
+          console.log(node.label);
+          // 如果拖动的是其他节点 则遍历到该节点时复制一个相同的节点并根据拖动偏移量计算出新位置并找到离它最近的节点模拟为新的父节点
+          const newNode = Object.assign({}, node);
+          newNode.x += this.dragEvent.changeX;
+          newNode.y += this.dragEvent.changeY;
 
-        const parent = this.getCloseNode(newNode);
-        if (parent) {
+          ctx.roundRect(newNode).stroke();
+          ctx.dashedBox(node).stroke();
+          ctx.setLineDash([]);
+
+          // 找到离当前位置最近的节点作为模拟的父节点并绘制连线
+          const parent = this.getCloseNode(newNode);
           this.dragEvent.parent = parent;
-
           ctx.beginPath();
           ctx.moveTo(parent.x + parent.width, parent.y + this.nodeAttrs.height / 2);
           ctx.lineTo(newNode.x, newNode.y + this.nodeAttrs.height / 2);
           ctx.stroke();
         }
       }
+
       // 绘制节点 
       ctx.roundRect(node).stroke();
-
 
       const children = node?.children;
       if (!children || children.length === 0) return;
@@ -168,28 +214,35 @@ export default {
         this.renderNodes(child)
       }
     },
-    // 渲染整棵树
-    treeRender() {
-      const canvas = this.$refs.canvas;
-      // 计算子树高度 
-      this.getSubtreeHeight(this.renderTree);
-      // 根据整个树的高度重新计算画布的高度和根节点的位置(居中)
-      canvas.height = this.renderTree.subtreeHeight + 300;
-      this.renderTree.x = 50;
-      this.renderTree.y = (this.renderTree.subtreeHeight + 300) / 2;
-      this.searchArray.length = 0;
-      this.searchArray.push(this.renderTree)
-      // 计算每个节点的坐标和宽度 并根据最右侧的节点更新画布的宽度
-      this.getRenderTreeAttrs(this.renderTree);
-      this.renderNodes(this.renderTree);
-      this.buttonRender();
-    },
-    // 清空画布
-    clearCanvas() {
+    // 渲染按钮
+    buttonRender() {
+      if (!this.editNode.showButton) return;
       const canvas = this.$refs.canvas;
       const ctx = canvas.getContext("2d");
-      this.searchArray.length = 0;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.circle(this.editNode.addButton).stroke();
+      ctx.circle(this.editNode.deleteButton).stroke();
+    },
+    // 清空按钮状态
+    resetState() {
+      this.editNode = {
+        target: null,
+        showButton: false,
+        showInput: false,
+        addButton: {
+          label: undefined,
+          id: undefined,
+          x: undefined,
+          y: undefined,
+          r: undefined
+        },
+        deleteButton: {
+          label: undefined,
+          id: undefined,
+          x: undefined,
+          y: undefined,
+          r: undefined
+        }
+      }
     },
     // 画布点击事件转发 (点击对象 点击类型)
     handleCanvasClick(e) {
@@ -306,14 +359,6 @@ export default {
       this.getInputAttr(node);
       this.render();
     },
-    // 渲染按钮
-    buttonRender() {
-      if (!this.editNode.showButton) return;
-      const canvas = this.$refs.canvas;
-      const ctx = canvas.getContext("2d");
-      ctx.circle(this.editNode.addButton).stroke();
-      ctx.circle(this.editNode.deleteButton).stroke();
-    },
     // 计算Input的属性
     getInputAttr(node) {
       const input = this.$refs.input;
@@ -354,7 +399,7 @@ export default {
       const newTree = Object.assign({}, this.tree)
       ergodicTree(newTree);
     },
-    // 删除一个节点和他的子节点
+    // 删除一个节点及其子节点
     deleteNode(target) {
       this.resetState();
       const ergodicTree = (node) => {
@@ -371,53 +416,38 @@ export default {
       const newTree = Object.assign({}, this.tree)
       ergodicTree(newTree);
     },
-    // id随机生成 = 节点名字 + 时间戳 + 随机数
+    // 随机生成节点id
     getRandomNodeId(label) {
       return label + Date.now() + Math.ceil(Math.random() * 100000);
     },
-    resetState() {
-      this.editNode = {
-        target: null,
-        showButton: false,
-        showInput: false,
-        addButton: {
-          label: undefined,
-          id: undefined,
-          x: undefined,
-          y: undefined,
-          r: undefined
-        },
-        deleteButton: {
-          label: undefined,
-          id: undefined,
-          x: undefined,
-          y: undefined,
-          r: undefined
-        }
-      }
-    },
+    // 拖动事件
     mouseDownAndMove(el, callback) {
-      // 添加鼠标按下监听
       const that = this;
       el.addEventListener("mousedown", function () {
-        // 开启动画
+        // 当鼠标按下时 添加鼠标移动监听
+        document.addEventListener("mousemove", callback);
+
+        // 拖拽事件的开始 
         that.dragEvent.startX = -9999;
         that.dragEvent.startY = -9999;
+        // 开启动画 
         that.animating = true;
         that.animation();
-        // 当鼠标按下时, 添加鼠标移动监听
-        document.addEventListener("mousemove", callback);
       });
-      // 添加鼠标弹起监听 , 即鼠标不在按下
       document.addEventListener("mouseup", function () {
-        // 此时移除 鼠标移动监听,移除指定 事件函数
+        // 当鼠标松开时 移除鼠标移动监听
         document.removeEventListener("mousemove", callback);
-        // 关闭动画 重置树
+
+        // 拖拽事件的结束 
+        // 关闭动画 
         window.cancelAnimationFrame(that.requestAnimation);
         that.animating = false;
 
-        // 清理被拖拽子树的状态
+        // 更新拖动前的根节点坐标 
+        that.rootPreCoordinate.x = that.renderTree.x;
+        that.rootPreCoordinate.y = that.renderTree.y;
 
+        // 清理被拖拽子树的状态 
         const ergodicTreeForCleanState = node => {
           if (!node) return;
           node.fillStyle = undefined;
@@ -425,10 +455,9 @@ export default {
           node.isDragNodeChild = undefined;
           if (node.children && node.children.length !== 0) for (let child of node.children) ergodicTreeForCleanState(child)
         }
-
         ergodicTreeForCleanState(that.dragEvent.target)
 
-        // 找到了新的父节点
+        // 更新被拖拽节点的父节点
         if (that.dragEvent.parent) {
           const newTree = Object.assign({}, that.tree);
           // 现在原来的树中将该节点删除
@@ -443,16 +472,24 @@ export default {
           ergodicTreeForDelete(newTree);
           // 找到父节点并在插入在合适的位置
           const ergodicTreeForInsert = node => {
-            // 如果找到了父节点 遍历他的子节点找到第一个y坐标大于target.y的节点并在他前面插入
             if (node.id === that.dragEvent.parent.id) {
+              // 如果父节点是叶子节点
               if (!node.children || node.children.length === 0) return that.$set(node, 'children', [that.dragEvent.target]);
-              else for (let i = 0; i < node.children.length; i++) if (node.children[i].y >= that.dragEvent.target.y || i === node.children.length - 1) return node.children.splice(i - 1, 0, that.dragEvent.target)
+              else {
+                // 遍历子节点找到第一个在鼠标上方的节点
+                for (let i = node.children.length - 1; i >= 0; i--) {
+                  const child = node.children[i];
+                  if (child.y <= that.dragEvent.target.y || i === 0) return node.children.splice(i, 0, that.dragEvent.target);
+                }
+              }
             }
             if (node.children && node.children.length !== 0) for (let child of node.children) ergodicTreeForInsert(child)
           }
           ergodicTreeForInsert(newTree);
           that.$emit('treeChange', newTree)
         }
+
+        // 清空拖动状态
         that.dragEvent = {
           target: null,
           startX: undefined,
@@ -461,10 +498,9 @@ export default {
           changeY: undefined,
           parent: null
         }
-
-
       });
     },
+    // 拖动事件的回调
     handleMouseDownAndMove(e) {
       if (this.dragEvent.startX === -9999 || this.dragEvent.startY === -9999) {
         this.dragEvent.startX = e.x;
@@ -477,6 +513,7 @@ export default {
       this.dragEvent.changeY = e.y - this.dragEvent.startY;
 
     },
+    // 开启动画
     animation() {
       const renderAnimation = (timeStamp) => {
         this.render();
@@ -484,7 +521,7 @@ export default {
       };
       this.requestAnimation = window.requestAnimationFrame(renderAnimation);
     },
-    // 获得一个子树离根节点最远的节点的右侧x坐标 (同时将子树的样式改变)
+    // 获得一个子树离根节点最远的节点的右侧x坐标 (同时将被拖拽子树的样式改变)
     getFarthestX(node) {
       node.fillStyle = 'gray';
       node.strokeStyle = 'gray';
@@ -494,6 +531,7 @@ export default {
       for (let child of node.children) ans = Math.max(ans, this.getFarthestX(child));
       return ans;
     },
+    // 找到离目标节点最近的节点
     getCloseNode(target) {
       // 找到一个节点 他离当前节点的位置最近且不能是当前节点的子节点(包括自身)
       const x = target.x, y = target.y + this.nodeAttrs.height / 2;
@@ -627,6 +665,7 @@ export default {
     };
 
     const canvas = this.$refs.canvas;
+    // 绑定拖动事件
     this.mouseDownAndMove(canvas, this.handleMouseDownAndMove);
     this.renderTree = Object.assign({}, this.tree);
     this.render();
